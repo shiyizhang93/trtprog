@@ -2,11 +2,6 @@
 // Created by shiyi on 2021/7/5.
 //
 
-#include "logger.h"
-
-#include "NvOnnxParser.h"
-#include "NvInfer.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cuda_runtime_api.h>
@@ -14,11 +9,28 @@
 #include <iostream>
 #include <string>
 #include <opencv2/opencv.hpp>
+
+#include "NvOnnxParser.h"
+#include "NvInfer.h"
 #include "ReadMnist.h"
+
+#if NV_TENSORRT_MAJOR >= 8
+#define TRT_NOEXCEPT noexcept
+#else
+#define TRT_NOEXCEPT
+#endif
 
 using namespace nvinfer1;
 
-static Logger gLogger;
+class Logger : public ILogger
+{
+    void log(Severity severity, const char* msg) TRT_NOEXCEPT override
+    {
+        // suppress info-level messages
+        if (severity == Severity::kERROR)
+            std::cout << msg << std::endl;
+    }
+} gLogger;
 
 const int BATCH_SIZE = 1;
 const int IMG_H = 28;
@@ -26,9 +38,6 @@ const int IMG_W = 28;
 const int OUTPUT_SIZE = 10;
 const char* INPUT_BLOB_NAME = "input";
 const char* OUTPUT_BLOB_NAME = "output";
-
-
-
 
 
 void doInference(IExecutionContext& context, float* input, float* output, int input_index, int output_index)

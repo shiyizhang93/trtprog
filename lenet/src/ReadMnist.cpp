@@ -8,8 +8,6 @@
 #include <opencv2/opencv.hpp>
 #include "ReadMnist.h"
 
-using namespace std;
-
 const int MAGICNUMIMG = 2051;
 const int MAGICNUMLABEL = 2049;
 const int IMG_H = 28;

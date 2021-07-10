@@ -5,6 +5,8 @@
 #ifndef LENET_INCLUDE_READMNIST_H_
 #define LENET_INCLUDE_READMNIST_H_
 
+#include <opencv2/opencv.hpp>
+
 class ReadMnist
 {
  public:
