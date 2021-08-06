@@ -6,7 +6,6 @@ import os
 from model import LeNet
 
 
-
 DIR = './weights'
 WTS = 'mnist_net.pt'
 

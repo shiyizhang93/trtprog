@@ -5,8 +5,7 @@
 //!
 //! \Create 07/05/2021
 //!
-//! \Modify 07/12/2021
-
+//! \ChangeLog 08/04/2021 Enable FP16 Precision
 
 #include <algorithm>
 #include <cmath>
@@ -45,26 +44,37 @@ const int OUTPUT_SIZE = 10;
 const char* INPUT_BLOB_NAME = "input";
 const char* OUTPUT_BLOB_NAME = "output";
 
-const char onnx_path[] = "../onnx/mnist_net.onnx";
-const char plan_path[] = "../plan/lenet.plan";
 std::string test_img = "../data/MNIST/raw/t10k-images-idx3-ubyte";
 std::string test_label = "../data/MNIST/raw/t10k-labels-idx1-ubyte";
 static float input[BATCH_SIZE * 1 * IMG_H * IMG_W];
 static float output[BATCH_SIZE * OUTPUT_SIZE];
+const int FP32 = 0;
+const int FP16 = 1;
 
 
-int buildEngine()
+int buildEngine(std::string onnx_path, std::string plan_path, int prec_idx)
 {
     IBuilder* builder = createInferBuilder(gLogger);
     const auto explicitBatch = 1U << static_cast<uint32_t>(NetworkDefinitionCreationFlag::kEXPLICIT_BATCH);
     INetworkDefinition* network = builder->createNetworkV2(explicitBatch);
     nvonnxparser::IParser* parser = nvonnxparser::createParser(*network, gLogger);
-    parser->parseFromFile(onnx_path, static_cast<int>(Logger::Severity::kWARNING));
+    const char* onnx_path_cstr = onnx_path.c_str();
+    parser->parseFromFile(onnx_path_cstr, static_cast<int>(Logger::Severity::kWARNING));
     for (int i = 0; i < parser->getNbErrors(); ++i)
     {
         std::cout << parser->getError(i)->desc() << std::endl;
     }
-    IBuilderConfig* config = builder->createBuilderConfig();
+    IBuilderConfig* config;
+
+    if (prec_idx == FP16)
+    {
+        config->setFlag(BuilderFlag::kFP16);
+        config = builder->createBuilderConfig();
+    }
+    else
+    {
+        config = builder->createBuilderConfig();
+    }
     config->setMaxWorkspaceSize(1 << 25);
     ICudaEngine* engine = builder->buildEngineWithConfig(*network, *config);
     IHostMemory* serialized_model = engine->serialize();
@@ -87,7 +97,7 @@ int buildEngine()
 }
 
 
-ICudaEngine* deserializeEngine()
+ICudaEngine* deserializeEngine(std::string plan_path)
 {
     std::ifstream plan_file(plan_path, std::ios::binary);
     char *model_stream{nullptr};
@@ -148,10 +158,31 @@ void softmax(float *x)
 
 int main(int argc, char** argv)
 {
+    std::string onnx_path = argv[1];
+    std::string plan_path = argv[2];
     std::ifstream plan_file(plan_path, std::ios::binary);
-    if(!plan_file.good())
-        buildEngine();
-    ICudaEngine* engine = deserializeEngine();
+    if (!plan_file.good())
+    {
+        if (argc != 4)
+        {
+            std::cerr << "arguments not right!" << std::endl;
+            std::cerr << "./lenet [.onnx] [.plan] -fp32  // build TensorRT Engine to "
+                         "plan file with FP32 Precision" << std::endl;
+            std::cerr << "./lenet [.onnx] [.plan] -fp16  // build TensorRT Engine to "
+                         "plan file with FP16 Precision" << std::endl;
+            return -1;
+        }
+        else if (argv[3] == "-fp16")
+        {
+            buildEngine(onnx_path, plan_path, FP16);
+        }
+        else
+        {
+            buildEngine(onnx_path, plan_path, FP32);
+        }
+    }
+
+    ICudaEngine* engine = deserializeEngine(plan_path);
     IExecutionContext *context = engine->createExecutionContext();
     int input_index = engine->getBindingIndex(INPUT_BLOB_NAME);
     int output_index = engine->getBindingIndex(OUTPUT_BLOB_NAME);

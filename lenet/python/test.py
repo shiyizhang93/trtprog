@@ -6,7 +6,7 @@ from model import LeNet
 
 
 PATH = './weights/mnist_net.pt'
-
+# PATH = './weights/mnist_net_int8.pt'
 
 def trans_img():
     transform = transforms.Compose(
