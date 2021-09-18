@@ -9,8 +9,8 @@ include_directories(include)
 include_directories(/usr/local/cuda-11.3/include)
 link_directories(/usr/local/cuda-11.3/lib64)
 # tensorrt
-include_directories(/home/shiyi/3rdParty/TensorRT-8.0.1.6/include)
-link_directories(/home/shiyi/3rdParty/TensorRT-8.0.1.6/lib)
+include_directories(/home/shiyi/3rdParty/TensorRT-8.0.3.4/include)
+link_directories(/home/shiyi/3rdParty/TensorRT-8.0.3.4/lib)
 # OpenCV
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
