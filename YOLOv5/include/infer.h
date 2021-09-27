@@ -6,6 +6,7 @@
 #define YOLOV5_YOLOV5_H_
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <string>
 #include <cuda_runtime_api.h>
@@ -13,6 +14,12 @@
 #include "NvInferRuntimeCommon.h"
 #include "opencv2/opencv.hpp"
 #include "NvInfer.h"
+
+#if NV_TENSORRT_MAJOR >= 8
+#define TRT_NOEXCEPT noexcept
+#else
+#define TRT_NOEXCEPT
+#endif
 
 
 const int NewShape[2] = {640, 640};
@@ -33,7 +40,7 @@ struct DetBox {
 };
 
 
-class Logger : public ILogger{
+class Logger : public nvinfer1::ILogger{
 
         void log(Severity severity, const char* msg) TRT_NOEXCEPT override
                 {
@@ -53,19 +60,16 @@ class Infer {
         int outputIndex;
 
     public:
-        Infer(const std::string &planPath);
+        Infer(const char *planPath);
         virtual ~Infer();
 
         int doInfer(const std::vector<cv::Mat> &images, std::vector<std::vector<DetBox>> *box);
 
     private:
-        int scaleFit(cv::Mat &image, cv::Mat &imagePadding, cv::Scalar color;
-        int preProcess(const std::vector<cv::Mat> images, float *modelIn);
-        int detect(const std::vector<cv::Mat> &images, float* modelIn, float* modelOut);
+        int scaleFit(const cv::Mat &image, cv::Mat &imagePadding, cv::Scalar color, int newShape[2], int stride);
+        int preProcess(const std::vector<cv::Mat> &images, float *modelIn, int newShape[2], int stride, int batchSize);
+        int detect(const std::vector<cv::Mat> &images, float* modelIn, float* modelOut, int newShape[2], int batchSize);
         int postProcess(float* modelOut);
-        void nms();
-        float iou();
-        bool cmp();
 };
 
 #endif //YOLOV5_YOLOV5_H_

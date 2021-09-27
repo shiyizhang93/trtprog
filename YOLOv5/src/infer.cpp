@@ -2,10 +2,10 @@
 // Created by shiyi on 2021/9/9.
 //
 
-#include "include/infer.h"
+#include "infer.h"
 
 
-Infer::Infer(const std::string &planPath) {
+Infer::Infer(const char *planPath) {
     std::ifstream planFile(planPath, std::ios::binary);
     size_t size{0};
     planFile.seekg(0, planFile.end);
@@ -25,31 +25,31 @@ Infer::Infer(const std::string &planPath) {
 Infer::~Infer() {
     context->destroy();
     engine->destroy();
-    modelStream->destroy();
+    delete []modelStream;
 }
 
 
 int Infer::doInfer(const std::vector<cv::Mat> &images, std::vector<std::vector<DetBox>> *box) {
     // Get the local variable value of NewShape and Stride
-    int newShape[2] = NewShape;
+    int newShape[2] = {NewShape[0], NewShape[1]};
     int stride = Stride;
     int batchSize = images.size();
     float modelIn[batchSize * 3 * newShape[0] * newShape[1] * sizeof(float)];
     float modelOut[batchSize * OutputFeatures * (OutputClasses + 5) * sizeof(float)];
     // Do pre-process
-    preProcess(images, &modelIn, newShape, stride, batchSize);
+    preProcess(images, modelIn, newShape, stride, batchSize);
     // Pass input data to model and get output data
-    detect(images, &modelIn, modelOut, newShape, batchSize);
+    detect(images, modelIn, modelOut, newShape, batchSize);
     // Do post-process
 
 }
 
 
-int Infer::scaleFit(cv::Mat &image, cv::Mat &imagePadding, cv::Scalar color, int newShape[2], int stride) {
+int Infer::scaleFit(const cv::Mat &image, cv::Mat &imagePadding, cv::Scalar color, int newShape[2], int stride) {
     // Get the original shape of image
     int shape[2] = {image.size().height, image.size().width}; // current shape {height, width}
     // Get the minimum fraction ratio
-    float ratio = min(newShape[0] / shape[0], newShape[1] / shape[1]);
+    float ratio = fmin(newShape[0] / shape[0], newShape[1] / shape[1]);
     // Compute padding {width, height}
     int newUnpad[2] = {(int) round(newShape[1] * ratio), (int) round(newShape[0] * ratio)};
     int dw = ((newShape[1] - newUnpad[0]) % Stride) / 2;
@@ -62,7 +62,7 @@ int Infer::scaleFit(cv::Mat &image, cv::Mat &imagePadding, cv::Scalar color, int
     int bottom = (int) round(dh + 0.1);
     int left = (int) round(dw - 0.1);
     int right = (int) round(dw + 0.1);
-    cv::copyMakeBorder(img, imagePadding, top, bottom, left, right, cv::BORDER_CONSTANT, value=color);
+    cv::copyMakeBorder(img, imagePadding, top, bottom, left, right, cv::BORDER_CONSTANT, color);
 
     return 0;
 }
@@ -72,9 +72,9 @@ int Infer::preProcess(const std::vector<cv::Mat> &images, float *modelIn, int ne
     cv::Scalar color = cv::Scalar(114, 114, 114);
     for (int b = 0; b < batchSize; b++){
         cv::Mat imagePadding;
-        scaleFit(images[b], imagePadding, color, newShape[2], stride);
+        scaleFit(images[b], imagePadding, color, newShape, stride);
         int i = 0;
-        for (int r = 0, r < imagePadding.rows, r++){
+        for (int r = 0; r < imagePadding.rows; r++){
             uchar* ucPixel = imagePadding.data + r * imagePadding.step;
             for (int c = 0; c < imagePadding.cols; c++){
                 modelIn[batchSize * 3 * imagePadding.rows * imagePadding.cols + i] = (float)ucPixel[2] / 255.0;
@@ -108,11 +108,7 @@ int Infer::detect(const std::vector<cv::Mat> &images, float* modelIn, float* mod
     cudaStreamDestroy(stream);
     cudaFree(buffers[inputIndex]);
     cudaFree(buffers[outputIndex]);
+    auto end = std::chrono::system_clock::now();
 
     return 0;
-}
-
-
-int postProcess(float* modelOut){
-
 }
