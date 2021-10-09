@@ -33,17 +33,25 @@ int nonMaxSuppression(float *prediction, std::vector<std::vector<float*>> nmsOut
         }
     }
 
-    // Traverse anchor candidates to compute the total confidence - obj_conf * cls_conf
+    // Traverse anchor candidates to compute the total confidence, obj_conf * cls_conf
     for (int i = 0; i < anchorCands.size(); i++){
         for (int j = 5; j < numClasses; j++){
             anchorCands[i][j] *= anchorCands[i][4];
         }
     }
 
-
 }
 
 
-int xywh2xyxy(std::vector<float*>& box){
+int cxcywh2xywh(std::vector<std::vector<float>>& bboxes) {
+    for (int i = 0; i < bboxes.size(); i++) {
+        bboxes[i][0] = bboxes[i][0] - 0.5 * bboxes[i][2];
+        bboxes[i][1] = bboxes[i][1] - 0.5 * bboxes[i][3];
+    }
+}
+
+
+int nmsBoxes(const std::vector<std::vector<float>>& bboxes, const std::vector<float>& scores,
+             const float confThres, const float iouThres, std::vector<int>& indices, const float eta, const int topK) {
 
 }
