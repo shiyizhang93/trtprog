@@ -14,6 +14,7 @@
 #include "NvInferRuntimeCommon.h"
 #include "opencv2/opencv.hpp"
 #include "NvInfer.h"
+#include "common.h"
 
 #if NV_TENSORRT_MAJOR >= 8
 #define TRT_NOEXCEPT noexcept
@@ -69,7 +70,7 @@ class Infer {
         int scaleFit(const cv::Mat &image, cv::Mat &imagePadding, cv::Scalar color, int newShape[2], int stride);
         int preProcess(const std::vector<cv::Mat> &images, float *modelIn, int newShape[2], int stride, int batchSize);
         int detect(const std::vector<cv::Mat> &images, float* modelIn, float* modelOut, int newShape[2], int batchSize);
-        int postProcess(float* modelOut);
+        int postProcess(const std::vector<cv::Mat> &images, float* modelOut);
 };
 
 #endif //YOLOV5_YOLOV5_H_

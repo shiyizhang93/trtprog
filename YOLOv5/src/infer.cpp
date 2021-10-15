@@ -112,3 +112,8 @@ int Infer::detect(const std::vector<cv::Mat> &images, float* modelIn, float* mod
 
     return 0;
 }
+
+
+int Infer::postProcess(const std::vector<cv::Mat> &images, float* modelOut, std::vector<Bbox> &postOut) {
+
+}

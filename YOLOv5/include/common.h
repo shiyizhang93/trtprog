@@ -11,19 +11,23 @@
 #include <chrono>
 
 
+#include "opencv2/opencv.hpp"
 
-int nonMaxSuppression(float *prediction, std::vector<std::vector<float*>> nmsOutput,
+
+struct Bbox{
+    cv::Rect rect;
+    int cls;
+    float conf;
+};
+
+int nonMaxSuppression(float *prediction, std::vector<Bbox>& nmsBboxes,
                       float confThres, float iouThres, int numClasses);
 
-int cxcywh2xywh(std::vector<float*>& box);
+int cxcywh2xywh(std::vector<float>& boxes);
 
-int nmsBoxes(const std::vector<std::vector<float>>& bboxes, const std::vector<float>& scores,
-             const float confThres, const float iouThres, std::vector<int>& indices,
-             const float eta = 1.f, const int topK = 0);
+bool descendingSort(const Bbox& a, const Bbox& b);
 
-bool cmp();
-
-float iou();
+int scaleCoords(const int imgShape[2], const int img0Shape[2], std::vector<Bbox> &nmsBboxes, bool ratioPad = false);
 
 
 #endif //YOLOV5_COMMON_H_
