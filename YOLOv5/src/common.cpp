@@ -129,5 +129,52 @@ bool descendingSort(const Bbox& a, const Bbox& b) {
 
 int scaleCoords(const int imgShape[2], const int img0Shape[2], std::vector<Bbox> &nmsBboxes, bool ratioPad) {
     // Rescale coords (xywh) from imgShape to img0Shape
+    float gain = fmin(imgShape[0] / img0Shape[0], imgShape[1] / img0Shape[1]);
+    int pad[2] = {(imgShape[1] - img0Shape[1] * 2) / 2, (imgShape[0] - img0Shape[0] * 2) / 2};
+    for (int i = 0; i < nmsBboxes.size(); i ++) {
+        nmsBboxes[i].rect.x = (nmsBboxes[i].rect.x - pad[0]) / gain;
+        nmsBboxes[i].rect.y = (nmsBboxes[i].rect.y - pad[1]) / gain;
+        nmsBboxes[i].rect.width /= gain;
+        nmsBboxes[i].rect.height /= gain;
+        int flag = clipCoords(nmsBboxes[i].rect, img0Shape);
+        if (flag == 1){
+            nmsBboxes.erase(nmsBboxes.begin() + i);
+        }
+        else {
+            continue;
+        }
+    }
+}
 
+
+int clipCoords(cv::Rect &box, const int imgShape[2]) {
+    if (box.x < 0 ) {
+        box.x = 0;
+    }
+    else if (box.x > imgShape[1]) {
+        return 1;
+    }
+    //
+    if (box.y < 0) {
+        box.y = 0;
+    }
+    else if (box.y > imgShape[0]) {
+        return 1;
+    }
+    //
+    if ((box.x + box.width) < 0) {
+        return 1;
+    }
+    else if ((box.x + box.width) > imgShape[1]) {
+        box.width = imgShape[1] - box.x;
+    }
+    //
+    if ((box.y + box.height) < 0) {
+        return 1;
+    }
+    else if ((box.y + box.height) > imgShape[0]) {
+        box.height = imgShape[0] - box.y;
+    }
+
+    return 0;
 }

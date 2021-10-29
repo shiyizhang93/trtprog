@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.19)
 project(yolov5)
 
 set(CMAKE_CXX_STANDARD 11)
-add_definitions(-O2 -pthread)
+add_definitions(-O2 -debug -pthread)
 
 include_directories(include)
 # cuda
@@ -16,8 +16,17 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 link_directories(${OpenCV_LIBRARY_DIRS})
 
-add_executable(yolov5 src/infer.cpp src/common.cpp)
-target_link_libraries(yolov5 nvinfer)
-target_link_libraries(yolov5 nvonnxparser)
-target_link_libraries(yolov5 cudart)
-target_link_libraries(yolov5 ${OpenCV_LIBS})
+## lib
+#link_directories(${PROJECT_SOURCE_DIR}/lib)
+#
+#set(SRC_LIST src/infer.cpp src/common.cpp)
+#set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
+#add_library(yolov5 SHARED ${SRC_LIST})
+
+add_executable(yolov5det src/main.cpp src/infer.cpp src/common.cpp include/common.h)
+
+target_link_libraries(yolov5det nvinfer)
+target_link_libraries(yolov5det nvonnxparser)
+target_link_libraries(yolov5det nvinfer_plugin)
+target_link_libraries(yolov5det cudart)
+target_link_libraries(yolov5det ${OpenCV_LIBS})
