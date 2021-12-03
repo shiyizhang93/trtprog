@@ -6,36 +6,49 @@
 #include "NvInferPlugin.h"
 
 
-const int BatchSize = 1;
-const int NewShape[2] = {640, 384};
-const int Stride = 32;
-const char* InputBlobName = "images";
-const char* OutputBlobName = "output";
-const char* OutputBlobName1 = "outputFea1";
-const char* OutputBlobName2 = "outputFea2";
-const char* OutputBlobName3 = "outputFea3";
-const int OutputClasses = 80;
-const int OutputFeatures = 15120;
-
-const float ConfThres = 0.25;
-const float IouThres = 0.45;
-
 Logger gLogger;
 
+// Initialize static class member variables
+int YoloDet::Channel = 3;
+int YoloDet::NewShape[2] = {384, 640};
+int YoloDet::OutputClasses = 80;
+int YoloDet::OutputFeatures = 25200;
+float YoloDet::ConfThres = 0.25;
+float YoloDet::IouThres = 0.45;
+char *YoloDet::InputBlobName = "images";
+char *YoloDet::OutputBlobName = "output";
+char *YoloDet::OutputLAncBlobName = "output_l";
+char *YoloDet::OutputMAncBlobName = "output_m";
+char *YoloDet::OutputSAncBlobName = "output_s";
+int YoloDet::Stride = 32;
 
-Infer::Infer(const char *planPath) {
 
-    std::ifstream planFile(planPath, std::ios::binary);
+YoloDet::YoloDet(const char *planPath, int bs)
+{
+    // Assign batch size user input as class private member variable
+    batchSize = bs;
+    // Assign the value of static member to local variable
+    int channel = Channel;
+    auto newShape = NewShape;
+    int outputClasses = OutputClasses;
+    int outputFeatures = OutputFeatures;
+    // Initialize class private member variables
+    modelIn = new float[batchSize * channel * newShape[0] * newShape[1]];
+    modelOut = new float[batchSize * outputFeatures * (outputClasses + 5)];
+    // Initialize local variables
     size_t size = 0;
 
+    // Read TensorRT plan file
+    std::ifstream planFile(planPath, std::ios::binary);
     planFile.seekg(0, planFile.end);
     size = planFile.tellg();
     planFile.seekg(0, planFile.beg);
-    std::cout << "size: " << size << std::endl;
+    // Initialize a stream to store plan file info
     modelStream = new char[size];
     assert(modelStream);
     planFile.read(modelStream, size);
     planFile.close();
+
     bool flag = initLibNvInferPlugins(&gLogger, "");
     std::cout << "flag: " << flag << std::endl;
     runtime = nvinfer1::createInferRuntime(gLogger);
@@ -82,18 +95,31 @@ int Infer::doInfer(const std::vector<cv::Mat*> &images, std::vector<std::vector<
     // Do pre-process
     preProcess(images, modelIn, newShape, stride, batchSize);
 
-    for (int i = 0; i < sizeof(modelIn)/sizeof(float); i++) {
-        std::cout << i <<":"<< modelIn[i] << std::endl;
-    }
+//    std::cout << modelIn[10+200*640] << "," << modelIn[10+200*640+384*640] << "," << modelIn[10+200*640+2*384*640] << std::endl;
 
     // Pass input data to model and get output data
     detect(modelIn, modelOut, newShape, batchSize, outputFea, outputCls);
+
 //    for (int i = 0; i < sizeof(modelOut)/sizeof(float); i++) {
 //        std::cout << i <<":"<< modelOut[i] << std::endl;
 //    }
+
+//    for (int i = 0; i < 85; i++) {
+//        std::cout << i <<":"<< modelIn[i] << std::endl;
+//    }
+//    for (int i = 15119*85; i < 15120*85; i++) {
+//        std::cout << i <<":"<< modelOut[i] << std::endl;
+//    }
+
     // Do post-process
     int modelOutSize = int(batchSize * outputFea * ( outputCls + 5 ));
     postProcess(images, modelOut, postOut, newShape, modelOutSize);
+
+    for (int i = 0; i < postOut.size(); i++) {
+        for (int j = 0; j < postOut[i].size(); j++){
+            std::cout << "ClassID" << postOut[i][j].cls << std::endl;
+        }
+    }
 
    for (int b = 0; b < batchSize; b++) {
        for (int i = 0; i < postOut[b].size(); i++) {
@@ -174,7 +200,7 @@ int Infer::preProcess(const std::vector<cv::Mat*> &images, float *modelIn, int n
 }
 
 
-int Infer::detect(float* modelIn, float* modelOut, int newShape[2], int batchSize,
+int Infer::detect(float *modelIn, float *modelOut, int newShape[2], int batchSize,
                   int outputFeatures, int outputClasses) {
 
     // Run inference
@@ -205,7 +231,7 @@ int Infer::detect(float* modelIn, float* modelOut, int newShape[2], int batchSiz
     }
     cudaMemcpyAsync(modelOut,
                     buffers[outputIndex],
-                    batchSize * outputFeatures * (outputClasses + 5),
+                    batchSize * outputFeatures * (outputClasses + 5) * sizeof(float),
                     cudaMemcpyDeviceToHost, stream);
     cudaStreamSynchronize(stream);
     cudaStreamDestroy(stream);
@@ -227,12 +253,18 @@ int Infer::postProcess(const std::vector<cv::Mat*> &images, float* modelOut, std
     for (int b = 0; b < batchSize; b++){
         // Init intermediate variables
         std::vector<Bbox> nmsBboxes;
+        std::vector<Bbox> scaleBboxes;
         int img0Shape[2] = {images[b]->cols, images[b]->rows};
         //
 
         nonMaxSuppression(modelOut, nmsBboxes, ConfThres, IouThres, OutputClasses, modelOutSize);
-        scaleCoords(newShape, img0Shape, nmsBboxes);
-        postOut.push_back(nmsBboxes);
+        std::cout << "nmsBoxes size: " << nmsBboxes.size() << std::endl;
+        for (int i = 0; i < nmsBboxes.size(); i++) {
+            std::cout << "rect: " << nmsBboxes[i].rect << std::endl;
+        }
+
+        scaleCoords(newShape, img0Shape, nmsBboxes, scaleBboxes);
+        postOut.push_back(scaleBboxes);
     }
     return 0;
 

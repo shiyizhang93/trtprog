@@ -26,7 +26,8 @@ int cxcywh2xywh(std::vector<float> &boxes);
 
 bool descendingSort(const Bbox& a, const Bbox& b);
 
-int scaleCoords(const int imgShape[2], const int img0Shape[2], std::vector<Bbox> &nmsBboxes, bool ratioPad = false);
+int scaleCoords(const int imgShape[2], const int img0Shape[2], std::vector<Bbox> &nmsBboxes,
+                std::vector<Bbox> &scaleBboxes, bool ratioPad = false);
 
 int clipCoords(cv::Rect &box, const int imgShape[2]);
 

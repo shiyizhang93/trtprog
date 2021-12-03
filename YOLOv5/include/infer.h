@@ -22,19 +22,19 @@
 #endif
 
 
-extern const int BatchSize;
-extern const int NewShape[2];
-extern const int Stride;
-extern const char* InputBlobName;
-extern const char* OutputBlobName;
-extern const int OutputClasses;
-extern const int OutputFeatures;
+//extern const int BatchSize;
+//extern const int NewShape[2];
+//extern const int Stride;
+//extern const char* InputBlobName;
+//extern const char* OutputBlobName;
+//extern const int OutputClasses;
+//extern const int OutputFeatures;
+//
+//extern const float ConfThres;
+//extern const float IouThres;
 
-extern const float ConfThres;
-extern const float IouThres;
-
-class Logger : public nvinfer1::ILogger{
-
+class Logger : public nvinfer1::ILogger
+{
         void log(Severity severity, const char* msg) TRT_NOEXCEPT override
         {
             // suppress info-level messages
@@ -45,7 +45,8 @@ class Logger : public nvinfer1::ILogger{
 extern Logger gLogger;
 
 
-struct DetBox {
+struct YoloDetBox
+{
     int x;
     int y;
     int width;
@@ -55,37 +56,57 @@ struct DetBox {
 };
 
 
-class Infer {
+class YoloDet
+{
+    public:
+        YoloDet(const char *planPath, int bs);
+        virtual ~YoloDet();
 
-        char *modelStream{nullptr};
+        int doDet(const std::vector<cv::Mat*> &images,
+                  std::vector<std::vector<YoloDetBox>> &inferOut);
+
+    private:
+        // Declaring static variables
+        static int Channel;
+        static int NewShape[2];
+        static char* InputBlobName;
+        static char* OutputBlobName;
+        static char* OutputLAncBlobName;
+        static char* OutputMAncBlobName;
+        static char* OutputSAncBlobName;
+        static int OutputClasses;
+        static int OutputFeatures;
+        static float ConfThres;
+        static float IouThres;
+        static int Stride;
+
+        int batchSize;
+        char* modelStream{nullptr};
         nvinfer1::IRuntime* runtime = nullptr;
         nvinfer1::ICudaEngine* engine = nullptr;
         nvinfer1::IExecutionContext* context = nullptr;
         int inputIndex;
         int outputIndex;
-        int outputIndex1;
-        int outputIndex2;
-        int outputIndex3;
+        void* buffers[5];
+        cudaStream_t stream;
+        float *modelIn;
+        float *modelOut;
 
+        int preProcess(const std::vector<cv::Mat*> &images,
+                       float *modelIn,
+                       int channel, int newShape[2], int stride);
 
-    public:
-        Infer(const char *planPath);
-        virtual ~Infer();
+        int scaleFit(const cv::Mat &image,
+                     cv::Mat &imagePadding,
+                     cv::Scalar color, int channel, int newShape[2], int stride);
 
-        int doInfer(const std::vector<cv::Mat*> &images, std::vector<std::vector<DetBox>> &inferOut, int batchSize = BatchSize);
+        int detect(float* modelIn,
+                   float* modelOut,
+                   int channel, int newShape[2], int outputFeatures = OutputFeatures, int outputClasses = OutputClasses);
 
-    private:
-        int scaleFit(const cv::Mat &image, cv::Mat &imagePadding,
-                     cv::Scalar color, int newShape[2], int stride);
-
-        int preProcess(const std::vector<cv::Mat*> &images, float *modelIn, int newShape[2], int stride,
-                       int batchSize = BatchSize);
-
-        int detect(float* modelIn, float* modelOut, int newShape[2], int batchSize = BatchSize,
-                   int outputFeatures = OutputFeatures, int outputClasses = OutputClasses);
-
-        int postProcess(const std::vector<cv::Mat*> &images, float* modelOut, std::vector<std::vector<Bbox>> &postOut,
-                        int newShape[2], int modelOutSize, int batchSize = BatchSize);
+        int postProcess(float* modelOut,
+                        std::vector<std::vector<Bbox>> &postOut,
+                        const std::vector<cv::Mat*> &images, int channel, int newShape[2], int modelOutSize);
 };
 
 #endif //YOLOV5_INFER_H_
