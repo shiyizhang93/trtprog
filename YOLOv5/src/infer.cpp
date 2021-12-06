@@ -49,8 +49,6 @@ YoloDet::YoloDet(const char *planPath, int bs)
     planFile.read(modelStream, size);
     planFile.close();
 
-    bool flag = initLibNvInferPlugins(&gLogger, "");
-    std::cout << "flag: " << flag << std::endl;
     runtime = nvinfer1::createInferRuntime(gLogger);
     engine = runtime->deserializeCudaEngine(modelStream, size);
     context = engine->createExecutionContext();
@@ -58,42 +56,43 @@ YoloDet::YoloDet(const char *planPath, int bs)
     assert(engine->getNbBindings() == 5);
     inputIndex = engine->getBindingIndex(InputBlobName);
     outputIndex = engine->getBindingIndex(OutputBlobName);
-    outputIndex1 = engine->getBindingIndex(OutputBlobName1);
-    outputIndex2 = engine->getBindingIndex(OutputBlobName2);
-    outputIndex3 = engine->getBindingIndex(OutputBlobName3);
+    outputLAncIndex = engine->getBindingIndex(OutputLAncBlobName);
+    outputMAncIndex = engine->getBindingIndex(OutputMAncBlobName);
+    outputSAncIndex = engine->getBindingIndex(OutputSAncBlobName);
+    context->setBindingDimensions(inputIndex,
+                                  nvinfer1::Dims4(batchSize, channel, newShape[0], newShape[1]));
+    context->setBindingDimensions(outputIndex,
+                                  nvinfer1::Dims3(batchSize, outputFeatures, outputClasses));
+    context->setBindingDimensions(outputLAncIndex,
+                                  nvinfer1::Dims3(batchSize, outputFeatures, outputClasses));
 
 
 
 }
 
 
-Infer::~Infer() {
-
-    //context->destroy();
-    //engine->destroy();
-    //runtime->destroy();
+YoloDet::~YoloDet()
+{
     delete []modelStream;
-
 }
 
 
-int Infer::doInfer(const std::vector<cv::Mat*> &images, std::vector<std::vector<DetBox>> &inferOut, int batchSize) {
-
+int YoloDet::doDet(const std::vector<cv::Mat*> &images,
+                   std::vector<std::vector<YoloDetBox>> &inferOut)
+{
     // Get the local variable value of NewShape and Stride
-    int newShape[2] = {NewShape[0], NewShape[1]};
+    int channel = Channel;
+    auto newShape = NewShape;
     int outputFea = OutputFeatures;
     int outputCls = OutputClasses;
     int stride = Stride;
-    float modelIn[batchSize * 3 * newShape[0] * newShape[1]];
 
-//    float *modelOut = new float[batchSize * outputFea * (outputCls + 5)];
-    float modelOut[batchSize * outputFea * ( outputCls + 5 )];
     std::vector<std::vector<Bbox>> postOut;
-    DetBox detBox;
-    std::vector<DetBox> boxes;
+    YoloDetBox detBox;
+    std::vector<YoloDetBox> boxes;
 
     // Do pre-process
-    preProcess(images, modelIn, newShape, stride, batchSize);
+    preProcess(images, modelIn, channel, newShape, stride);
 
 //    std::cout << modelIn[10+200*640] << "," << modelIn[10+200*640+384*640] << "," << modelIn[10+200*640+2*384*640] << std::endl;
 
@@ -135,72 +134,77 @@ int Infer::doInfer(const std::vector<cv::Mat*> &images, std::vector<std::vector<
     }
 
    return 0;
-
 }
 
 
-int Infer::scaleFit(const cv::Mat &image, cv::Mat &imagePadding, cv::Scalar color, int newShape[2], int stride) {
-
+int YoloDet::scaleFit(const cv::Mat& image,
+                      cv::Mat& imagePadding,
+                      cv::Scalar color, int newShape[2], int stride)
+{
     // Get the original shape of image
-    int shape[2] = {image.size().width, image.size().height}; // current shape {height, width}
+    int shape[2] = {image.size().height, image.size().width}; // current shape {height, width}
     // Get the minimum fraction ratio
     float ratio = fmin((float) newShape[0] / shape[0], (float) newShape[1] / shape[1]);
     std::cout << newShape[0] << "," << newShape[1] << std::endl;
-    // Compute padding {width, height}
+    // Compute padding {height, width}
     int newUnpad[2] = {(int) round(shape[0] * ratio), (int) round(shape[1] * ratio)};
     std::cout << newUnpad[0] << "," << newUnpad[1] << std::endl;
-    int dw = ((newShape[0] - newUnpad[0]) % stride) / 2;
-    int dh = ((newShape[1] - newUnpad[1]) % stride) / 2;
+    int dh = ((newShape[0] - newUnpad[0]) % stride) / 2;
+    int dw = ((newShape[1] - newUnpad[1]) % stride) / 2;
+
     cv::Mat img;
     if (shape[0] != newShape[0] && shape[1] != newShape[1]){
-        cv::resize(image, img, cv::Size(newUnpad[0], newUnpad[1]));
+        cv::resize(image, img, cv::Size(newUnpad[1], newUnpad[0]));
     }
     int top = (int) round(dh - 0.1);
     int bottom = (int) round(dh + 0.1);
     int left = (int) round(dw - 0.1);
     int right = (int) round(dw + 0.1);
     cv::copyMakeBorder(img, imagePadding, top, bottom, left, right, cv::BORDER_CONSTANT, color);
-    return 0;
 
+    return 0;
 }
 
 
-int Infer::preProcess(const std::vector<cv::Mat*> &images, float *modelIn, int newShape[2], int stride, int batchSize) {
-
+int YoloDet::preProcess(const std::vector<cv::Mat*>& images,
+                        float* modelIn,
+                        int channel, int newShape[2], int stride)
+{
     cv::Scalar color = cv::Scalar(114, 114, 114);
-    for (int b = 0; b < batchSize; b++) {
+    for (int b = 0; b < batchSize; b++)
+    {
         cv::Mat imagePadding;
         scaleFit(*images[b], imagePadding, color, newShape, stride);
-        // Test
-
-        int flag = 0;
-        for (int r = 0; r < imagePadding.rows; r++){
-            uchar* ucPixel = imagePadding.data + r * imagePadding.step;
-            for (int c = 0; c < imagePadding.cols; c++){
-
-                ucPixel += 3;
-                flag++;
-            }
-        }
-
+//        // Test
+//        int flag = 0;
+//        for (int r = 0; r < imagePadding.rows; r++){
+//            uchar* ucPixel = imagePadding.data + r * imagePadding.step;
+//            for (int c = 0; c < imagePadding.cols; c++){
+//
+//                ucPixel += 3;
+//                flag++;
+//            }
+//        }
         int i = 0;
-        for (int r = 0; r < imagePadding.rows; r++){
+        for (int r = 0; r < imagePadding.rows; r++)
+        {
             uchar* ucPixel = imagePadding.data + r * imagePadding.step;
-            for (int c = 0; c < imagePadding.cols; c++){
-                modelIn[b * 3 * imagePadding.rows * imagePadding.cols + i] = (float)ucPixel[2] / 255.0;
-                modelIn[b * 3 * imagePadding.rows * imagePadding.cols + i + imagePadding.rows * imagePadding.cols] = (float)ucPixel[1] / 255.0;
-                modelIn[b * 3 * imagePadding.rows * imagePadding.cols + i + 2 * imagePadding.rows * imagePadding.cols] = (float)ucPixel[0] / 255.0;
-                ucPixel += 3;
+            for (int c = 0; c < imagePadding.cols; c++)
+            {
+                modelIn[b * channel * imagePadding.rows * imagePadding.cols + i] = (float)ucPixel[2] / 255.0;
+                modelIn[b * channel * imagePadding.rows * imagePadding.cols + i + imagePadding.rows * imagePadding.cols] = (float)ucPixel[1] / 255.0;
+                modelIn[b * channel * imagePadding.rows * imagePadding.cols + i + 2 * imagePadding.rows * imagePadding.cols] = (float)ucPixel[0] / 255.0;
+                ucPixel += channel;
                 i++;
             }
         }
     }
-    return 0;
 
+    return 0;
 }
 
 
-int Infer::detect(float *modelIn, float *modelOut, int newShape[2], int batchSize,
+int YoloDet::detect(float *modelIn, float *modelOut, int newShape[2], int batchSize,
                   int outputFeatures, int outputClasses) {
 
     // Run inference
@@ -212,11 +216,6 @@ int Infer::detect(float *modelIn, float *modelOut, int newShape[2], int batchSiz
     auto ret3 = cudaMalloc(&buffers[outputIndex1], batchSize * 3 * 80 * 48 * (outputClasses + 5) * sizeof(float));
     auto ret4 = cudaMalloc(&buffers[outputIndex2], batchSize * 3 * 40 * 24 * (outputClasses + 5) * sizeof(float));
     auto ret5 = cudaMalloc(&buffers[outputIndex3], batchSize * 3 * 20 * 12 * (outputClasses + 5) * sizeof(float));
-    std::cout << "ret1: " << ret1 << std::endl;
-    std::cout << "ret2: " << ret2 << std::endl;
-    std::cout << "ret3: " << ret3 << std::endl;
-    std::cout << "ret4: " << ret4 << std::endl;
-    std::cout << "ret5: " << ret5 << std::endl;
 
     cudaStream_t stream;
     cudaMemcpyAsync(buffers[inputIndex],
@@ -247,7 +246,7 @@ int Infer::detect(float *modelIn, float *modelOut, int newShape[2], int batchSiz
 }
 
 
-int Infer::postProcess(const std::vector<cv::Mat*> &images, float* modelOut, std::vector<std::vector<Bbox>> &postOut,
+int YoloDet::postProcess(const std::vector<cv::Mat*> &images, float* modelOut, std::vector<std::vector<Bbox>> &postOut,
                        int newShape[2], int modelOutSize, int batchSize ) {
 
     for (int b = 0; b < batchSize; b++){

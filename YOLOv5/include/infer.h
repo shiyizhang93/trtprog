@@ -87,18 +87,21 @@ class YoloDet
         nvinfer1::IExecutionContext* context = nullptr;
         int inputIndex;
         int outputIndex;
+        int outputLAncIndex;
+        int outputMAncIndex;
+        int outputSAncIndex;
         void* buffers[5];
         cudaStream_t stream;
-        float *modelIn;
-        float *modelOut;
+        float* modelIn;
+        float* modelOut;
 
-        int preProcess(const std::vector<cv::Mat*> &images,
-                       float *modelIn,
+        int preProcess(const std::vector<cv::Mat*>& images,
+                       float* modelIn,
                        int channel, int newShape[2], int stride);
 
-        int scaleFit(const cv::Mat &image,
-                     cv::Mat &imagePadding,
-                     cv::Scalar color, int channel, int newShape[2], int stride);
+        int scaleFit(const cv::Mat& image,
+                     cv::Mat& imagePadding,
+                     cv::Scalar color, int newShape[2], int stride);
 
         int detect(float* modelIn,
                    float* modelOut,
@@ -106,7 +109,7 @@ class YoloDet
 
         int postProcess(float* modelOut,
                         std::vector<std::vector<Bbox>> &postOut,
-                        const std::vector<cv::Mat*> &images, int channel, int newShape[2], int modelOutSize);
+                        const std::vector<cv::Mat*>& images, int channel, int newShape[2], int modelOutSize);
 };
 
 #endif //YOLOV5_INFER_H_
