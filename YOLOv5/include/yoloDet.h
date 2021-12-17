@@ -22,17 +22,6 @@
 #endif
 
 
-//extern const int BatchSize;
-//extern const int NewShape[2];
-//extern const int Stride;
-//extern const char* InputBlobName;
-//extern const char* OutputBlobName;
-//extern const int OutputClasses;
-//extern const int OutputFeatures;
-//
-//extern const float ConfThres;
-//extern const float IouThres;
-
 class Logger : public nvinfer1::ILogger
 {
         void log(Severity severity, const char* msg) TRT_NOEXCEPT override
@@ -59,11 +48,11 @@ struct YoloDetBox
 class YoloDet
 {
     public:
-        YoloDet(const char *planPath, int bs);
+        YoloDet(const char* planPath, int bs);
         virtual ~YoloDet();
 
-        int doDet(const std::vector<cv::Mat*> &images,
-                  std::vector<std::vector<YoloDetBox>> &inferOut);
+        int doDet(const std::vector<cv::Mat*>& images,
+                  std::vector<std::vector<YoloDetBox>>& inferOut);
 
     private:
         // Declaring static variables
@@ -76,20 +65,29 @@ class YoloDet
         static char* OutputSAncBlobName;
         static int OutputClasses;
         static int OutputFeatures;
+        static int AnchorNum;
+        static int LargeFeatureH;
+        static int LargeFeatureW;
+        static int MediumFeatureH;
+        static int MediumFeatureW;
+        static int SmallFeatureH;
+        static int SmallFeatureW;
         static float ConfThres;
         static float IouThres;
         static int Stride;
 
         int batchSize;
+        int modelInSize;
+        int modelOutSize;
         char* modelStream{nullptr};
         nvinfer1::IRuntime* runtime = nullptr;
         nvinfer1::ICudaEngine* engine = nullptr;
         nvinfer1::IExecutionContext* context = nullptr;
         int inputIndex;
         int outputIndex;
-        int outputLAncIndex;
-        int outputMAncIndex;
-        int outputSAncIndex;
+        int outputLargeFeaIndex;
+        int outputMediumFeaIndex;
+        int outputSmallFeaIndex;
         void* buffers[5];
         cudaStream_t stream;
         float* modelIn;
@@ -97,7 +95,7 @@ class YoloDet
 
         int preProcess(const std::vector<cv::Mat*>& images,
                        float* modelIn,
-                       int channel, int newShape[2], int stride);
+                       int batchSize, int channel, int newShape[2], int stride);
 
         int scaleFit(const cv::Mat& image,
                      cv::Mat& imagePadding,
@@ -105,11 +103,11 @@ class YoloDet
 
         int detect(float* modelIn,
                    float* modelOut,
-                   int channel, int newShape[2], int outputFeatures = OutputFeatures, int outputClasses = OutputClasses);
+                   int batchSize, int channel, int newShape[2], int outputFeatures, int outputClasses);
 
         int postProcess(float* modelOut,
-                        std::vector<std::vector<Bbox>> &postOut,
-                        const std::vector<cv::Mat*>& images, int channel, int newShape[2], int modelOutSize);
+                        std::vector<std::vector<Bbox>>& postOut,
+                        const std::vector<cv::Mat*>& images, int batchSize, int newShape[2], int modelOutSize);
 };
 
 #endif //YOLOV5_INFER_H_

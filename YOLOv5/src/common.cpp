@@ -6,8 +6,10 @@
 #include "common.h"
 
 
-int nonMaxSuppression(float *prediction, std::vector<Bbox> &nmsBboxes, float confThres, float iouThres,
-                      int numClasses, int modelOutSize) {
+int nonMaxSuppression(float *prediction,
+                      std::vector<Bbox> &nmsBboxes,
+                      float confThres, float iouThres, int batchNum, int numClasses, int modelOutSize)
+{
     // Settings
     int minWH = 2;
     int maxWH = 4096;
@@ -23,48 +25,45 @@ int nonMaxSuppression(float *prediction, std::vector<Bbox> &nmsBboxes, float con
     cv::Rect rect;
     std::vector<float> score;
     Bbox nmsBbox;
+    int predOffset = batchNum * modelOutSize;
 
     // Set clock start
     auto start = std::chrono::system_clock::now();
 
     // Traverse every anchor box to extract higher object confidence anchor boxes
-    for (int i = 4; i < modelOutSize; i += (numClasses + 5) ) {
-
-        if (prediction[i] > confThres) {
-            for (int j = i - 4; j < ((i - 4) + numClasses + 5); j++) {
+    for (int i = 4; i < modelOutSize; i += (numClasses + 5) )
+    {
+        if (prediction[i + predOffset] > confThres)
+        {
+            for (int j = i + predOffset - 4; j < ((i + predOffset - 4) + numClasses + 5); j++)
+            {
                 anchorCand.push_back(prediction[j]);
             }
             anchorCands.push_back(anchorCand);
             anchorCand.clear();
         }
-        else {
+        else
+        {
             continue;
         }
     }
-
-//    for(int i = 0; i < 85; i++) {
-//        std::cout << i << ":" << anchorCands[34][i] << std::endl;
-//    }
-
     // Check the number of anchors
-    if (anchorCands.size() == 0) {
+    if (anchorCands.size() == 0)
+    {
         return 1;
     }
-
     // Traverse anchor candidates to compute the total confidence, obj_conf * cls_conf
-    for (int i = 0; i < anchorCands.size(); i++) {
-        for (int j = 5; j < (numClasses+5); j++){
+    for (int i = 0; i < anchorCands.size(); i++)
+    {
+        for (int j = 5; j < (numClasses+5); j++)
+        {
             anchorCands[i][j] *= anchorCands[i][4];
         }
     }
-
-//    for(int i = 0; i < 85; i++) {
-//        std::cout << i << ":" << anchorCands[0][i] << std::endl;
-//    }
-
     // Filter best class only
     // bboxes(cv::Rect, cls, conf)
-    for (int i = 0; i < anchorCands.size(); i++) {
+    for (int i = 0; i < anchorCands.size(); i++)
+    {
         // anchor candidates (center x, center y, width, height) to (x1, y1, width, height)
         cxcywh2xywh(anchorCands[i]);
         // convert std::vector<float> to cv::Rect and copy the result to bboxes
@@ -74,14 +73,16 @@ int nonMaxSuppression(float *prediction, std::vector<Bbox> &nmsBboxes, float con
                              anchorCands[i][3]);
         // Find the max confidence value and the corresponding value position
         bbox.cls = std::max_element(anchorCands[i].begin() + 5, anchorCands[i].end()) - (anchorCands[i].begin() + 5);
-        bbox.conf = *std::max_element(anchorCands[i].begin()+5, anchorCands[i].end());
+        bbox.conf = *std::max_element(anchorCands[i].begin() + 5, anchorCands[i].end());
         bboxes.push_back(bbox);
     }
     // Check if the size of bboxes greater than maxNms, descending Sort the bboxes and erase the excess bboxes
-    if (bboxes.size() > maxNms) {
+    if (bboxes.size() > maxNms)
+    {
         std::cout << "Exceeding max size of the number of bounding boxes ..." << std::endl;
         std::sort(bboxes.begin(), bboxes.end(), descendingSort);
-        for (int i = 0; i < bboxes.size() - maxNms; i++){
+        for (int i = 0; i < bboxes.size() - maxNms; i++)
+        {
             bboxes.erase(bboxes.begin() + maxNms + i);
         }
     }
@@ -89,7 +90,8 @@ int nonMaxSuppression(float *prediction, std::vector<Bbox> &nmsBboxes, float con
     std::vector<int> classID;
     // Batched NMS
     // rect offset by class, and conf
-    for (int i = 0; i < bboxes.size(); i++) {
+    for (int i = 0; i < bboxes.size(); i++)
+    {
         rect = cv::Rect(bboxes[i].rect.x + bboxes[i].cls * maxWH,
                         bboxes[i].rect.y + bboxes[i].cls * maxWH,
                         bboxes[i].rect.width,
@@ -99,7 +101,8 @@ int nonMaxSuppression(float *prediction, std::vector<Bbox> &nmsBboxes, float con
         classID.push_back(bboxes[i].cls);
     }
     std::cout << "rect_size: " << rects.size() << std::endl;
-    for (int i = 0; i < score.size(); i++) {
+    for (int i = 0; i < score.size(); i++)
+    {
         std::cout << classID[i] << ": " << score[i] << std::endl;
         std::cout << rects[i] << std::endl;
     }
@@ -107,8 +110,10 @@ int nonMaxSuppression(float *prediction, std::vector<Bbox> &nmsBboxes, float con
     cv::dnn::NMSBoxes(rects, score, confThres, iouThres, indices);
     std::cout << "indices size: " << indices.size() << std::endl;
     // Get the left boxes
-    if (indices.size() > maxDet) {
-        for (int i = 0; i < maxDet; i++) {
+    if (indices.size() > maxDet)
+    {
+        for (int i = 0; i < maxDet; i++)
+        {
             int idx = indices[i];
             nmsBbox.rect = bboxes[idx].rect;
             nmsBbox.cls = bboxes[idx].cls;
@@ -117,7 +122,8 @@ int nonMaxSuppression(float *prediction, std::vector<Bbox> &nmsBboxes, float con
             nmsBboxes.push_back(nmsBbox);
         }
     }
-    for (int i = 0; i < indices.size(); i++) {
+    for (int i = 0; i < indices.size(); i++)
+    {
         int idx = indices[i];
         nmsBbox.rect = bboxes[idx].rect;
         nmsBbox.cls = bboxes[idx].cls;
@@ -130,8 +136,8 @@ int nonMaxSuppression(float *prediction, std::vector<Bbox> &nmsBboxes, float con
 }
 
 
-int cxcywh2xywh(std::vector<float>& boxes) {
-
+int cxcywh2xywh(std::vector<float>& boxes)
+{
     boxes[0] = boxes[0] - 0.5 * boxes[2];
     boxes[1] = boxes[1] - 0.5 * boxes[3];
 
@@ -139,68 +145,79 @@ int cxcywh2xywh(std::vector<float>& boxes) {
 }
 
 
-bool descendingSort(const Bbox& a, const Bbox& b) {
+bool descendingSort(const Bbox& a, const Bbox& b)
+{
+    return a.conf > b.conf;
+}
 
-        return a.conf > b.conf;
-    }
 
-
-int scaleCoords(const int imgShape[2], const int img0Shape[2], std::vector<Bbox> &nmsBboxes,
-                std::vector<Bbox> &scaleBboxes, bool ratioPad) {
+int scaleCoords(std::vector<Bbox>& nmsBboxes,
+                std::vector<Bbox>& scaleBboxes,
+                const int imgShape[2], const int img0Shape[2], bool ratioPad)
+{
     // Rescale coords (xywh) from imgShape to img0Shape
     float gain = fmin(float(imgShape[0]) / float(img0Shape[0]), float(imgShape[1]) / float(img0Shape[1]));
     int pad[2] = {static_cast<int>((imgShape[1] - img0Shape[1] * gain) / 2), static_cast<int>((imgShape[0] - img0Shape[0] * gain) / 2)};
-    for (int i = 0; i < nmsBboxes.size(); i ++) {
+    for (int i = 0; i < nmsBboxes.size(); i ++)
+    {
         Bbox box;
-        box.rect.x = (nmsBboxes[i].rect.x - pad[1]) / gain;
-        box.rect.y = (nmsBboxes[i].rect.y - pad[0]) / gain;
+        box.rect.x = (nmsBboxes[i].rect.x - pad[0]) / gain;
+        box.rect.y = (nmsBboxes[i].rect.y - pad[1]) / gain;
         box.rect.width = nmsBboxes[i].rect.width / gain;
         box.rect.height = nmsBboxes[i].rect.height / gain;
         box.cls = nmsBboxes[i].cls;
         box.conf = nmsBboxes[i].conf;
 
-        std::cout << "rect: " <<box.rect << std::endl;
-
-
         int flag = clipCoords(box.rect, img0Shape);
-        if (flag == 1){
+        if (flag == 1)
+        {
             continue;
 //            scaleBboxes.erase(scaleBboxes.begin() + i);
         }
-        else {
+        else
+        {
             scaleBboxes.push_back(box);
         }
     }
 }
 
 
-int clipCoords(cv::Rect &box, const int imgShape[2]) {
-    if (box.x < 0 ) {
+int clipCoords(cv::Rect& box,
+               const int imgShape[2])
+{
+    if (box.x < 0 )
+    {
         box.x = 0;
     }
-    else if (box.x > imgShape[0]) {
+    else if (box.x > imgShape[1])
+    {
         return 1;
     }
-    //
-    if (box.y < 0) {
+    if (box.y < 0)
+    {
         box.y = 0;
     }
-    else if (box.y > imgShape[1]) {
+    else if (box.y > imgShape[0])
+    {
         return 1;
     }
     //
-    if ((box.x + box.width) < 0) {
+    if ((box.x + box.width) < 0)
+    {
         return 1;
     }
-    else if ((box.x + box.width) > imgShape[0]) {
-        box.width = imgShape[0] - box.x;
+    else if ((box.x + box.width) > imgShape[1])
+    {
+        box.width = imgShape[1] - box.x;
     }
     //
-    if ((box.y + box.height) < 0) {
+    if ((box.y + box.height) < 0)
+    {
         return 1;
     }
-    else if ((box.y + box.height) > imgShape[1]) {
-        box.height = imgShape[1] - box.y;
+    else if ((box.y + box.height) > imgShape[0])
+    {
+        box.height = imgShape[0] - box.y;
     }
 
     return 0;

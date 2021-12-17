@@ -6,11 +6,11 @@ add_definitions(-O2 -debug -pthread)
 
 include_directories(include)
 # cuda
-include_directories(/usr/local/cuda-11.3/include)
-link_directories(/usr/local/cuda-11.3/lib64)
+include_directories(/usr/local/cuda-11.5/include)
+link_directories(/usr/local/cuda-11.5/lib64)
 # tensorrt
-include_directories(/home/shiyi/3rdParty/TensorRT-8.0.3.4/include)
-link_directories(/home/shiyi/3rdParty/TensorRT-8.0.3.4/lib)
+include_directories(/home/shiyi/3rdParty/TensorRT-8.2.1.8/include)
+link_directories(/home/shiyi/3rdParty/TensorRT-8.2.1.8/lib)
 # OpenCV
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -23,10 +23,9 @@ link_directories(${OpenCV_LIBRARY_DIRS})
 #set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #add_library(yolov5 SHARED ${SRC_LIST})
 
-add_executable(yolov5det src/main.cpp src/infer.cpp src/common.cpp include/common.h)
+add_executable(yolov5det src/main.cpp src/yoloDet.cpp src/common.cpp include/common.h)
 
 target_link_libraries(yolov5det nvinfer)
 target_link_libraries(yolov5det nvonnxparser)
-target_link_libraries(yolov5det nvinfer_plugin)
 target_link_libraries(yolov5det cudart)
 target_link_libraries(yolov5det ${OpenCV_LIBS})

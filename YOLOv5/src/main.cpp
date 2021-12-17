@@ -4,7 +4,7 @@
 
 #include <chrono>
 #include "opencv2/opencv.hpp"
-#include "infer.h"
+#include "yoloDet.h"
 
 
 int main() {
@@ -14,11 +14,12 @@ int main() {
     cv::Mat img = cv::imread(inputImg);
     std::vector<cv::Mat*> images;
     images.push_back(&img);
-    std::vector<std::vector<DetBox>> outBoxes;
+    std::vector<std::vector<YoloDetBox>> outBoxes;
+    int batchSize = 4;
 
-    Infer yolov5Det(PlanPath);
+    YoloDet Detector(PlanPath, batchSize);
 
-    yolov5Det.doInfer(images, outBoxes);
+    Detector.doDet(images, outBoxes);
 
     for (int i = 0; i < (int) images.size(); i++)
     {
