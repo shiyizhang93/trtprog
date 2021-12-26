@@ -2,7 +2,7 @@
 // Created by shiyi on 2021/9/9.
 //
 
-#include "yoloDet.h"
+#include "yolov5Det.h"
 
 
 Logger gLogger;

@@ -1,8 +1,8 @@
 //
 // Created by shiyi on 2021/9/9.
 //
-#ifndef YOLOV5_INFER_H_
-#define YOLOV5_INFER_H_
+#ifndef YOLOV5DET_H_
+#define YOLOV5DET_H_
 
 #include <iostream>
 #include <fstream>
@@ -110,4 +110,4 @@ class YoloDet
                         const std::vector<cv::Mat*>& images, int batchSize, int newShape[2], int modelOutSize);
 };
 
-#endif //YOLOV5_INFER_H_
+#endif //YOLOV5DET_H_

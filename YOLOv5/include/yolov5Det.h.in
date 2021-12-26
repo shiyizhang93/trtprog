@@ -1,0 +1,2 @@
+#define yolov5Det_VERSION_MAJOR @yolov5Det_VERSION_MAJOR@
+#define yolov5Det_VERSION_MINOR @yolov5Det_VERSION_MINOR@

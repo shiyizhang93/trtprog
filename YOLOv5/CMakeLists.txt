@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 3.19)
-project(yolov5)
 
+# Set project name and version
+project(yolov5Det VERSION 0.4)
+
+# Configure a header file to pass the version number to the source code
+configure_file(yolov5Det.h.in yolov5Det.h)
+
+# Specify the C++ standard
 set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED True)
+
 add_definitions(-O2 -debug -pthread)
 
 include_directories(include)
@@ -23,9 +31,11 @@ link_directories(${OpenCV_LIBRARY_DIRS})
 #set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #add_library(yolov5 SHARED ${SRC_LIST})
 
-add_executable(yolov5det src/main.cpp src/yoloDet.cpp src/common.cpp include/common.h)
+add_executable(yolov5Det src/main.cpp src/yolov5Det.cpp src/common.cpp include/common.h)
 
-target_link_libraries(yolov5det nvinfer)
-target_link_libraries(yolov5det nvonnxparser)
-target_link_libraries(yolov5det cudart)
-target_link_libraries(yolov5det ${OpenCV_LIBS})
+target_link_libraries(yolov5Det nvinfer)
+target_link_libraries(yolov5Det nvonnxparser)
+target_link_libraries(yolov5Det cudart)
+target_link_libraries(yolov5Det ${OpenCV_LIBS})
+
+target_include_directories(yolov5Det PUBLIC "${PROJECT_BINARY_DIR}")
