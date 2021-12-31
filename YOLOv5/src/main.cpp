@@ -4,11 +4,32 @@
 
 #include <chrono>
 #include "opencv2/opencv.hpp"
-#include "yoloDet.h"
+#include "yolov5Det.h"
+#include "yolov5DetConfig.h"
 
 
-int main() {
+int main(int argc, char* argv[])
+{
+    // user input error handling
+    if (argc == 1)
+    {
+        std::cout << "Please input the video path and the model path that you want to use to run the program,"
+        << std::endl;
+        std::cout << "or" << std::endl;
+        std::cout << "input -v, --version to check the project version.";
 
+        return 1;
+    }
+    // report project version
+    if (argv[1] == "-v" || argv[1] == "--version")
+    {
+        std::cout << argv[0] << "Version " << yolov5Det_VERSION_MAJOR << "."
+                  << yolov5Det_VERSION_MINOR << std::endl;
+        std::cout << "Usage: " << argv[0] << " number" << std::endl;
+
+        return 1;
+    }
+/////////////////////////////////////////////////////
     const char *PlanPath = "model.plan";
     std::string inputImg = "test.jpg";
     cv::Mat img = cv::imread(inputImg);

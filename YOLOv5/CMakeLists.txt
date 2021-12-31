@@ -1,10 +1,8 @@
+# Set cmake version
 cmake_minimum_required(VERSION 3.19)
 
 # Set project name and version
 project(yolov5Det VERSION 0.4)
-
-# Configure a header file to pass the version number to the source code
-configure_file(yolov5Det.h.in yolov5Det.h)
 
 # Specify the C++ standard
 set(CMAKE_CXX_STANDARD 11)
@@ -13,6 +11,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 add_definitions(-O2 -debug -pthread)
 
 include_directories(include)
+
+# Configure a header file to pass the version number to the source code
+configure_file(include/yolov5DetConfig.h.in yolov5DetConfig.h)
+
 # cuda
 include_directories(/usr/local/cuda-11.5/include)
 link_directories(/usr/local/cuda-11.5/lib64)
