@@ -14,6 +14,7 @@
 #include "opencv2/opencv.hpp"
 #include "NvInfer.h"
 #include "common.h"
+//#include "NvInferLegacyDims.h"
 
 #if NV_TENSORRT_MAJOR >= 8
 #define TRT_NOEXCEPT noexcept
@@ -24,14 +25,41 @@
 
 class Logger : public nvinfer1::ILogger
 {
-        void log(Severity severity, const char* msg) TRT_NOEXCEPT override
-        {
-            // suppress info-level messages
-            if (severity == Severity::kWARNING)
-                std::cout << msg << std::endl;
-        }
+    void log(Severity severity, const char* msg) TRT_NOEXCEPT override
+    {
+        // suppress info-level messages
+        if (severity == Severity::kWARNING)
+            std::cout << msg << std::endl;
+    }
 } ;
 extern Logger gLogger;
+
+
+class Dims5 : public nvinfer1::Dims
+{
+    public:
+        //!
+        //! \brief Construct an empty Dims5 object.
+        //!
+        Dims5()
+                : nvinfer1::Dims{5, {}}
+        {
+        }
+
+        //!
+        //! \brief Construct a Dims5 from 5 elements.
+        //!
+        //! \param d0 The first element.
+        //! \param d1 The second element.
+        //! \param d2 The third element.
+        //! \param d3 The fourth element.
+        //! \param d4 The fifth element.
+        //!
+        Dims5(int32_t d0, int32_t d1, int32_t d2, int32_t d3, int32_t d4)
+                : nvinfer1::Dims{5, {d0, d1, d2, d3, d4}}
+        {
+        }
+} ;
 
 
 struct YoloDetBox

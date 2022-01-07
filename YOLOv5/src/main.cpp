@@ -11,32 +11,38 @@
 int main(int argc, char* argv[])
 {
     // user input error handling
-    if (argc == 1)
-    {
-        std::cout << "Please input the video path and the model path that you want to use to run the program,"
-        << std::endl;
-        std::cout << "or" << std::endl;
-        std::cout << "input -v, --version to check the project version.";
-
-        return 1;
-    }
+//    if (argc == 1)
+//    {
+//        std::cout << "Please input the video path and the model path that you want to use to run the program,"
+//        << std::endl;
+//        std::cout << "or" << std::endl;
+//        std::cout << "input -v, --version to check the project version.";
+//
+//        return 1;
+//    }
     // report project version
-    if (argv[1] == "-v" || argv[1] == "--version")
+//    if (argv[1] == "-v" || argv[1] == "--version")
+    if (argc > 1)
     {
-        std::cout << argv[0] << "Version " << yolov5Det_VERSION_MAJOR << "."
-                  << yolov5Det_VERSION_MINOR << std::endl;
-        std::cout << "Usage: " << argv[0] << " number" << std::endl;
+        if ((!strcmp(argv[1], "--version")) || (!strcmp(argv[1], "-v")))
+        {
+            std::cout << argv[0] << "Version " << yolov5Det_VERSION_MAJOR << "."
+                      << yolov5Det_VERSION_MINOR << std::endl;
+            std::cout << "Usage: " << argv[0] << " number" << std::endl;
 
-        return 1;
+            return 1;
+        }
     }
+
 /////////////////////////////////////////////////////
-    const char *PlanPath = "model.plan";
-    std::string inputImg = "test.jpg";
+    const char *PlanPath = "../plan/yolov5n_384x640.plan";
+    std::string inputImg = "zidane.jpg";
+//    std::string inputImg = "../bus.jpg";
     cv::Mat img = cv::imread(inputImg);
     std::vector<cv::Mat*> images;
     images.push_back(&img);
     std::vector<std::vector<YoloDetBox>> outBoxes;
-    int batchSize = 4;
+    int batchSize = 1;
 
     YoloDet Detector(PlanPath, batchSize);
 
@@ -72,4 +78,5 @@ int main(int argc, char* argv[])
         cv::imwrite("./"+ std::to_string(i) + ".jpg", *images[i]);
     }
 
+    return 0;
 }

@@ -19,7 +19,7 @@ int YoloDet::MediumFeatureH = 24;
 int YoloDet::MediumFeatureW = 40;
 int YoloDet::SmallFeatureH = 12;
 int YoloDet::SmallFeatureW = 20;
-float YoloDet::ConfThres = 0.25;
+float YoloDet::ConfThres = 0.01;
 float YoloDet::IouThres = 0.45;
 char *YoloDet::InputBlobName = "images";
 char *YoloDet::OutputBlobName = "output";
@@ -79,11 +79,11 @@ YoloDet::YoloDet(const char* planPath, int bs)
     context->setBindingDimensions(outputIndex,
                                   nvinfer1::Dims3(batchSize, outputFeatures, outputClasses));
     context->setBindingDimensions(outputLargeFeaIndex,
-                                  nvinfer1::Dims4(batchSize, anchorNum, largeFeatureH * largeFeatureW, outputClasses));
+                                  Dims5(batchSize, anchorNum, largeFeatureH, largeFeatureW, outputClasses));
     context->setBindingDimensions(outputMediumFeaIndex,
-                                  nvinfer1::Dims4(batchSize, anchorNum, mediumFeatureH * mediumFeatureW, outputClasses));
+                                  Dims5(batchSize, anchorNum, mediumFeatureH, mediumFeatureW, outputClasses));
     context->setBindingDimensions(outputSmallFeaIndex,
-                                  nvinfer1::Dims4(batchSize, anchorNum, smallFeatureH * smallFeatureW, outputClasses));
+                                  Dims5(batchSize, anchorNum, smallFeatureH, smallFeatureW, outputClasses));
     assert(engine->getNbBindings() == 5);
     cudaMalloc(&buffers[inputIndex], batchSize * channel * newShape[0] * newShape[1]);
     cudaMalloc(&buffers[outputIndex], batchSize * outputFeatures * outputClasses);
@@ -132,6 +132,14 @@ int YoloDet::doDet(const std::vector<cv::Mat*>& images,
     preProcess(images, modelIn, bs, channel, newShape, stride);
     // Pass input data to model and get output data
     detect(modelIn, modelOut, bs, channel, newShape, outputFea, outputCls);
+    for (int i = 0; i < 85; i++)
+    {
+        std::cout << "modelIn: " << modelIn[i] << std::endl;
+    }for (int i = 0; i < 85; i++)
+    {
+        std::cout << "modelOut: " << modelOut[i] << std::endl;
+    }
+
     // Do post-process
     postProcess(modelOut, postOut, images, bs, newShape, modelOutSize);
 
@@ -163,6 +171,7 @@ int YoloDet::preProcess(const std::vector<cv::Mat*>& images,
     {
         cv::Mat imagePadding;
         scaleFit(*images[b], imagePadding, color, newShape, stride);
+        cv::imwrite("temp.jpg", imagePadding);
         int i = 0;
         for (int r = 0; r < imagePadding.rows; r++)
         {

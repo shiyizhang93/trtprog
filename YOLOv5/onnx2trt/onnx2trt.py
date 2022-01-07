@@ -33,6 +33,8 @@ Todo:
 """
 
 import argparse
+import os.path
+
 import tensorrt as trt
 import pycuda.driver as cuda
 import pycuda.autoinit
@@ -71,8 +73,7 @@ class ModelData(object):
     DTYPE = trt.float32
 
 
-def build_plan(input_name,
-               calibrator,
+def build_plan(input_name="images",
                onnx="../onnx/yolov5n_384x640_op12_dyn_sim.onnx",
                input_channel=3,
                img_size=(384,640),
@@ -81,8 +82,12 @@ def build_plan(input_name,
                min_batch_size=1,
                opt_batch_size=4,
                max_batch_size=16,
+               fp32=False,
+               fp16=False,
                int8=False,
                dla=-1,
+               calib_path="../dataPTQ/",
+               cache="./plan.cache",
                verbose=False):
     """Example function with PEP 484 type annotations.
 
@@ -94,7 +99,7 @@ def build_plan(input_name,
         The return value. True for success, False otherwise.
 
     """
-    logger = trt.Logger(trt.Logger.VERBOSE) if verbose else trt.Logger(trt.Logger.WARNING)
+    logger = trt.Logger(trt.Logger.VERBOSE) if verbose else trt.Logger(trt.Logger.ERROR)
     builder = trt.Builder(logger)
     explicit_batch = 1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
     network = builder.create_network(explicit_batch)
@@ -102,6 +107,10 @@ def build_plan(input_name,
     parser = trt.OnnxParser(network, logger)
     runtime = trt.Runtime(logger)
     print('Loading ONNX file from path {}'.format(onnx))
+
+    if not os.path.isfile(onnx):
+        raise ValueError('Please type the valid onnx file path!')
+
     print('Beginning ONNX file parsing')
     success = parser.parse_from_file(onnx)
     for idx in range(parser.num_errors):
@@ -124,15 +133,29 @@ def build_plan(input_name,
     else:
         # Set inference batch size if not dynamic batch
         builder.max_batch_size = min_batch_size
+        profile.set_shape(input_name,
+                          (min_batch_size, input_channel, img_size[0], img_size[1]),
+                          (min_batch_size, input_channel, img_size[0], img_size[1]),
+                          (min_batch_size, input_channel, img_size[0], img_size[1]))
+        config.add_optimization_profile(profile)
+
 
     if int8:
+        if not os.path.isdir(calib_path):
+            raise ValueError("The calibrator images directory is invalid!")
+        calib = YOLOEntropyCalibrator(calibration_images=calib_path,
+                                      cache=cache,
+                                      batch_size=opt_batch_size,
+                                      input_channel=input_channel,
+                                      img_size=img_size,
+                                      dtype=ModelData.DTYPE)
         # Set INT8 config
         config.set_flag(trt.BuilderFlag.INT8)
-        config.int8_calibrator = calibrator
+        config.int8_calibrator = calib
         if dynamic:
             config.set_calibration_profile(profile)
             ret = config.get_calibration_profile()
-    else:
+    elif fp16:
         config.set_flag(trt.BuilderFlag.FP16)
 
     # Set DLA Core config
@@ -144,7 +167,8 @@ def build_plan(input_name,
         print('Using DLA core %d.' % dla)
 
     # Build engine
-    print('Building a plan from {}; this may take a while ...'.format(onnx))
+    print('Building a plan from {}; \n'
+          'this may take a while ...'.format(onnx))
     plan = builder.build_engine(network, config)
     print('Completed plan building.')
     print("Engine dimension: ", plan.get_binding_shape(0))
@@ -163,6 +187,9 @@ def serialize_plan(trt_plan, plan_path):
         The return value. True for success, False otherwise.
 
     """
+    s = os.path.split(plan_path)
+    if not os.path.isdir(s[0]):
+        os.makedirs(s[0])
     with open(plan_path, 'wb') as f:
         f.write(trt_plan.serialize())
     print('Serialized the TensorRT engine to file: %s' % plan_path)
@@ -178,8 +205,10 @@ def run(input_name="images",
         min_batch_size=1,
         opt_batch_size=4,
         max_batch_size=16,
+        fp32=False,
+        fp16=False,
         int8=False,
-        calimg="../dataPTQ",
+        calimg="../dataPTQ/",
         cache="./plan.cache",
         dla=-1,
         verbose=False):
@@ -193,14 +222,7 @@ def run(input_name="images",
         The return value. True for success, False otherwise.
 
     """
-    calib = YOLOEntropyCalibrator(calibration_images=calimg,
-                                       cache=cache,
-                                       batch_size=opt_batch_size,
-                                       input_channel=inputch,
-                                       img_size=inputsz,
-                                       dtype=ModelData.DTYPE)
     trt_plan = build_plan(input_name=input_name,
-                          calibrator=calib,
                           onnx=onnx,
                           input_channel=inputch,
                           img_size=inputsz,
@@ -209,9 +231,14 @@ def run(input_name="images",
                           min_batch_size=min_batch_size,
                           opt_batch_size=opt_batch_size,
                           max_batch_size=max_batch_size,
+                          fp32=fp32,
+                          fp16=fp16,
                           int8=int8,
                           dla=dla,
+                          calib_path=calimg,
+                          cache=cache,
                           verbose=verbose)
+    # serialize the built plan to the path with customized filname
     serialize_plan(trt_plan, plan_path=plan)
 
 
@@ -228,18 +255,20 @@ def parse_opt():
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('--input_name', type=str, default="images", help='fill the model input')
-    parser.add_argument('--onnx', type=str, default="../onnx/yolov5n_384x640_op12_dyn_sim.onnx", help='path to onnx')
+    parser.add_argument('--onnx', type=str, default="../onnx/yolov5n_384x640_op12_dyn_sim.onnx", help='path to onnx file')
     parser.add_argument('--inputch', type=int, default=3, help='input c')
     parser.add_argument('--inputsz', type=int, default=[384, 640], help='input (h, w)')
-    parser.add_argument('--plan', type=str, default="../plan/yolov5n_384x640.plan", help='path to plan')
+    parser.add_argument('--plan', type=str, default="../plan/yolov5n_384x640.plan", help='path to save plan file')
     parser.add_argument('--workspace', type=int, default=1, help='workspace for engine building in GB unit')
     parser.add_argument('--dynamic', action='store_true', help='dynamic axes')
     parser.add_argument('--min_batch_size', type=int, default=1, help='minimum batch size for dynamic shapes')
     parser.add_argument('--opt_batch_size', type=int, default=4, help='optimization batch size for dynamic shapes')
     parser.add_argument('--max_batch_size', type=int, default=16, help='maximum batch size for dynamic shapes')
+    parser.add_argument('--fp32', action='store_true', help='FP32 weights')
+    parser.add_argument('--fp16', action='store_true', help='FP16 quantization')
     parser.add_argument('--int8', action='store_true', help='INT8 quantization')
-    parser.add_argument('--calimg', type=str, default="../dataPTQ", help='path to calibrator images')
-    parser.add_argument('--cache', type=str, default="./plan.cache", help='path to quantization calibrator cache')
+    parser.add_argument('--calimg', type=str, default="../dataPTQ", help='directory contained calibrator images')
+    parser.add_argument('--cache', type=str, default="./plan.cache", help='quantization calibrator cache filename')
     parser.add_argument('--dla', type=int, default=-1, help='dla 0 or 1 enabling')
     parser.add_argument('--verbose', action='store_true', help='building plan information')
     opt = parser.parse_args()
